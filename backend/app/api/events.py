@@ -78,20 +78,29 @@ def verify_event(event_id):
 
 @events_bp.route("/events/<event_id>/stats", methods=["GET"])
 def event_stats(event_id):
+    from sqlalchemy import func
+    from ..models import Image
+
     event = Event.query.get_or_404(event_id)
-    image_count = event.images.count()
-    face_count = sum(img.face_count for img in event.images.all())
-    processed_count = event.images.filter_by(is_processed=True).count()
-    total_size = sum(img.file_size for img in event.images.all())
+
+    # Single SQL aggregate instead of N+1 Python loops
+    stats = db.session.query(
+        func.count(Image.id).label("image_count"),
+        func.coalesce(func.sum(Image.face_count), 0).label("face_count"),
+        func.sum(
+            db.case((Image.is_processed == True, 1), else_=0)  # noqa: E712
+        ).label("processed_count"),
+        func.coalesce(func.sum(Image.file_size), 0).label("storage_used_bytes"),
+    ).filter(Image.event_id == event_id).first()
 
     return jsonify(
         {
             "event_id": event.id,
             "event_name": event.name,
-            "image_count": image_count,
-            "face_count": face_count,
-            "processed_count": processed_count,
-            "storage_used_bytes": total_size,
+            "image_count": stats.image_count,
+            "face_count": stats.face_count,
+            "processed_count": stats.processed_count,
+            "storage_used_bytes": stats.storage_used_bytes,
         }
     )
 
