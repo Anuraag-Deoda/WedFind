@@ -46,6 +46,10 @@ def register_request_hooks(app):
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         response.headers["Cache-Control"] = "no-store" if request.path.startswith("/api/") else "public, max-age=31536000"
 
+        # HSTS in production
+        if not current_app.debug:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
         log_level = logging.WARNING if response.status_code >= 400 else logging.INFO
         logger.log(
             log_level,
@@ -104,23 +108,59 @@ def register_error_handlers(app):
 # ── Auth Decorators ──────────────────────────────────────────────────
 
 def require_admin(f):
-    """Decorator requiring admin password in X-Admin-Password header."""
+    """Decorator requiring admin password in X-Admin-Password header.
+
+    Includes Redis-backed brute-force protection: locks out an IP after
+    5 failed attempts for 15 minutes.
+    """
     @wraps(f)
     def decorated(*args, **kwargs):
         password = request.headers.get("X-Admin-Password", "")
         stored_hash = current_app.config.get("ADMIN_PASSWORD_HASH", "")
 
         if not stored_hash:
-            # No admin password configured — allow in dev, reject in prod
-            if not current_app.debug:
-                return jsonify({"error": "Admin not configured"}), 503
-        else:
-            import bcrypt
-            if not bcrypt.checkpw(password.encode(), stored_hash.encode()):
-                return jsonify({"error": "Invalid admin credentials"}), 401
+            # No admin password configured — allow only with explicit DISABLE_AUTH
+            if current_app.config.get("DISABLE_AUTH"):
+                return f(*args, **kwargs)
+            return jsonify({"error": "Admin not configured"}), 503
+
+        # Check brute-force lockout
+        if _is_admin_locked_out():
+            return jsonify({"error": "Too many failed attempts. Try again later."}), 429
+
+        import bcrypt
+        if not bcrypt.checkpw(password.encode(), stored_hash.encode()):
+            _record_failed_admin_attempt()
+            return jsonify({"error": "Invalid admin credentials"}), 401
 
         return f(*args, **kwargs)
     return decorated
+
+
+def _is_admin_locked_out() -> bool:
+    """Check if this IP is locked out from admin login attempts."""
+    try:
+        import redis
+        r = redis.from_url(current_app.config.get("CELERY_BROKER_URL", "redis://localhost:6379/0"))
+        key = f"admin_lockout:{request.remote_addr}"
+        attempts = r.get(key)
+        return attempts is not None and int(attempts) >= 5
+    except Exception:
+        return False
+
+
+def _record_failed_admin_attempt():
+    """Record a failed admin login attempt in Redis."""
+    try:
+        import redis
+        r = redis.from_url(current_app.config.get("CELERY_BROKER_URL", "redis://localhost:6379/0"))
+        key = f"admin_lockout:{request.remote_addr}"
+        pipe = r.pipeline()
+        pipe.incr(key)
+        pipe.expire(key, 900)  # 15 minute lockout window
+        pipe.execute()
+    except Exception:
+        pass
 
 
 def require_event_access(f):
@@ -154,8 +194,8 @@ def require_event_access(f):
                 g.event_id = event_id
                 return f(*args, **kwargs)
 
-        # For now, allow access without token in development
-        if current_app.debug:
+        # Allow unauthenticated access only with explicit opt-in (testing only)
+        if current_app.config.get("DISABLE_AUTH"):
             g.event_id = event_id
             return f(*args, **kwargs)
 

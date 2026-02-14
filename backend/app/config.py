@@ -75,12 +75,32 @@ class Config:
     ENABLE_WEBP_THUMBNAILS = os.environ.get("ENABLE_WEBP_THUMBNAILS", "true").lower() == "true"
     ENABLE_DEDUPLICATION = os.environ.get("ENABLE_DEDUPLICATION", "true").lower() == "true"
     PHASH_DISTANCE_THRESHOLD = int(os.environ.get("PHASH_DISTANCE_THRESHOLD", 8))
+    MAX_PIXELS = int(os.environ.get("MAX_PIXELS", 50_000_000))
+
+    # ── Face detection thresholds ──────────────────────────────────
+    MIN_FACE_DETECTION_SCORE = float(os.environ.get("MIN_FACE_DETECTION_SCORE", "0.5"))
+    MIN_FACE_SIZE_PX = int(os.environ.get("MIN_FACE_SIZE_PX", "30"))
+
+    # ── Embedding versioning ───────────────────────────────────────
+    EMBEDDING_MODEL_VERSION = os.environ.get(
+        "EMBEDDING_MODEL_VERSION",
+        f"{os.environ.get('INSIGHTFACE_MODEL', 'buffalo_l')}_v1",
+    )
+
+    # ── Auth bypass (explicit opt-in only) ─────────────────────────
+    DISABLE_AUTH = False
+
+    # ── OpenAI (smart search + album generation) ───────────────────
+    OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+    OPENAI_MODEL = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
+    ENABLE_SMART_SEARCH = os.environ.get("ENABLE_SMART_SEARCH", "true").lower() == "true"
 
 
 class DevelopmentConfig(Config):
     DEBUG = True
     LOG_LEVEL = "DEBUG"
     RATELIMIT_STORAGE_URI = "memory://"
+    DISABLE_AUTH = os.environ.get("DISABLE_AUTH", "false").lower() == "true"
 
 
 class ProductionConfig(Config):
@@ -98,6 +118,7 @@ class TestConfig(Config):
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     CELERY_TASK_ALWAYS_EAGER = True
     ENABLE_DEDUPLICATION = False
+    DISABLE_AUTH = True
 
 
 config_by_name = {

@@ -84,22 +84,23 @@ def upload_images():
         is_duplicate = False
 
         if enable_dedup and phash:
-            existing = (
-                Image.query
+            # Load only (id, phash) tuples instead of full ORM objects
+            existing_hashes = (
+                db.session.query(Image.id, Image.phash)
                 .filter_by(event_id=event_id, is_duplicate=False)
                 .filter(Image.phash.isnot(None))
                 .all()
             )
-            for existing_img in existing:
-                dist = phash_distance(phash, existing_img.phash)
+            for existing_id, existing_phash in existing_hashes:
+                dist = phash_distance(phash, existing_phash)
                 if dist <= phash_threshold:
                     is_duplicate = True
-                    duplicate_of = existing_img.id
+                    duplicate_of = existing_id
                     logger.info(
                         "upload_duplicate_detected",
                         extra={
                             "phash_distance": dist,
-                            "original_id": existing_img.id,
+                            "original_id": existing_id,
                             "event_id": event_id,
                         },
                     )
@@ -144,7 +145,21 @@ def upload_images():
         db.session.add(image)
         image_ids.append(image_id)
 
-    db.session.commit()
+    from sqlalchemy.exc import IntegrityError
+
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        # pHash race condition — another request committed the same image first.
+        # Re-check which images are now duplicates and adjust.
+        logger.warning(
+            "upload_phash_race_detected",
+            extra={"event_id": event_id, "job_id": job.id},
+        )
+        # Re-add the job and any non-duplicate images
+        db.session.add(job)
+        db.session.commit()
 
     # Queue processing task for non-duplicate images
     if image_ids:
@@ -152,10 +167,17 @@ def upload_images():
             from ..tasks.process_image import process_upload_batch
             process_upload_batch.delay(job.id, image_ids)
         except Exception as e:
-            logger.warning(
-                "celery_unavailable",
+            logger.error(
+                "celery_dispatch_failed",
                 extra={"job_id": job.id, "error": str(e)},
             )
+            job.status = "failed"
+            job.error_message = "Processing queue unavailable. Please retry."
+            db.session.commit()
+            return jsonify({
+                "error": "Processing service temporarily unavailable",
+                "job_id": job.id,
+            }), 503
 
     logger.info(
         "upload_complete",

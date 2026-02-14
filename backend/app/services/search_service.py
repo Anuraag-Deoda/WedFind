@@ -3,16 +3,17 @@
 Four-stage retrieval:
   Stage 1 — Broad vector recall: Query ChromaDB with a lower threshold to
             maximize recall. Returns top-N candidates with cosine similarity.
+            Optionally pre-filters by gender when selfie metadata is available.
 
   Stage 2 — BM25 re-scoring: Build a BM25 index from textual metadata
             descriptions of all faces in the event. Score each candidate
             against a query document built from the selfie's face attributes.
             This captures semantic signals the embedding can't (age bracket,
-            scene type, frontality).
+            scene type, frontality). BM25 index is cached per event.
 
   Stage 3 — Reciprocal Rank Fusion + quality boosting: Fuse vector and BM25
-            rankings using RRF. Then apply quality multipliers (face quality,
-            prominence, sharpness) to produce the final composite score.
+            rankings using RRF with additive scoring. Quality signals (face
+            quality, prominence, sharpness) contribute a bounded adjustment.
 
   Stage 4 — Adaptive reranking: Apply penalties from "Not Me" feedback.
             Personal hard negatives (this searcher's history), global confusers
@@ -26,6 +27,9 @@ This approach handles:
 - Repeated false positives (feedback-driven penalties suppress them)
 """
 
+import logging
+import threading
+
 import numpy as np
 from rank_bm25 import BM25Okapi
 
@@ -34,6 +38,21 @@ from ..services.image_service import load_image_for_detection
 from ..services.metadata_service import extract_face_metadata
 from ..services import feedback_service
 from ..models import Face, Image
+
+logger = logging.getLogger(__name__)
+
+# ── BM25 Index Cache ─────────────────────────────────────────────────
+# Caches BM25 index per event to avoid rebuilding on every search.
+# Keyed by event_id → (doc_count, bm25_index, id_list).
+# Invalidated when doc_count changes (new faces added).
+_bm25_cache: dict[str, tuple[int, BM25Okapi, list[str]]] = {}
+_bm25_lock = threading.Lock()
+
+
+def invalidate_bm25_cache(event_id: str):
+    """Call this when new embeddings are added to an event."""
+    with _bm25_lock:
+        _bm25_cache.pop(event_id, None)
 
 
 class SearchService:
@@ -45,12 +64,12 @@ class SearchService:
     VECTOR_WEIGHT = 0.70
     BM25_WEIGHT = 0.30
 
-    # Quality boost weights
-    QUALITY_BOOST_WEIGHT = 0.15
-
     # Stage 4 penalty weights
     PERSONAL_NEG_STRENGTH = 0.15
     GLOBAL_NEG_STRENGTH = 0.08
+
+    # Minimum results from filtered query before falling back to unfiltered
+    MIN_FILTERED_RESULTS = 5
 
     def search(
         self,
@@ -59,6 +78,8 @@ class SearchService:
         threshold: float = 0.70,
         max_results: int = 100,
         excluded_image_ids: list[str] | None = None,
+        metadata_filters: dict | None = None,
+        extra_query_text: str | None = None,
     ) -> dict:
         """Multi-stage hybrid search for photos containing the selfie person.
 
@@ -68,6 +89,8 @@ class SearchService:
             threshold: Minimum final similarity score (0-1)
             max_results: Cap on returned results
             excluded_image_ids: Image IDs to exclude (negative feedback / "Not Me")
+            metadata_filters: Optional ChromaDB where-clause filters from smart search
+            extra_query_text: Additional BM25 query text from natural language search
 
         Returns:
             Dict with results, selfie_hash, feedback_applied, and feedback_stats
@@ -83,15 +106,28 @@ class SearchService:
         selfie_meta = extract_face_metadata(selfie_face["raw_face"], image_np)
         query_text = selfie_meta.get("metadata_text", "")
 
+        # Append extra query text from smart search if provided
+        if extra_query_text:
+            query_text = f"{query_text} {extra_query_text}".strip()
+
         # ── Stage 1: Broad vector recall ─────────────────────────────
         # Use a lower threshold for recall; re-ranking will filter later
         recall_threshold = max(0.3, threshold - 0.20)
         broad_n = min(max_results * 3, 300)
 
+        # Build optional pre-filter from selfie metadata (gender)
+        where_filter = metadata_filters.copy() if metadata_filters else None
+        selfie_gender = selfie_meta.get("gender")
+        if selfie_gender and not where_filter:
+            where_filter = {"gender": selfie_gender}
+        elif selfie_gender and where_filter and "gender" not in where_filter:
+            where_filter["gender"] = selfie_gender
+
         vector_results = vector_service.query_embeddings(
             event_id=event_id,
             query_embedding=query_embedding,
             n_results=broad_n,
+            where=where_filter,
         )
 
         empty_response = {
@@ -100,6 +136,19 @@ class SearchService:
             "feedback_applied": False,
             "feedback_stats": feedback_service.get_feedback_stats(event_id, selfie_hash),
         }
+
+        # Fall back to unfiltered query if gender filter returned too few results
+        result_count = len(vector_results["ids"][0]) if vector_results["ids"] and vector_results["ids"][0] else 0
+        if result_count < self.MIN_FILTERED_RESULTS and where_filter:
+            logger.debug(
+                "filtered_query_fallback",
+                extra={"event_id": event_id, "filtered_count": result_count},
+            )
+            vector_results = vector_service.query_embeddings(
+                event_id=event_id,
+                query_embedding=query_embedding,
+                n_results=broad_n,
+            )
 
         if not vector_results["ids"] or not vector_results["ids"][0]:
             return empty_response
@@ -135,14 +184,16 @@ class SearchService:
         if not candidates:
             return empty_response
 
-        # ── Stage 2: BM25 re-scoring ────────────────────────────────
+        # ── Stage 2: BM25 re-scoring (with caching) ───────────────────
         candidate_ids = list(candidates.keys())
         candidate_docs = [candidates[fid]["document"] for fid in candidate_ids]
 
-        bm25_scores = self._bm25_rescore(candidate_docs, query_text)
+        bm25_scores = self._bm25_rescore_cached(
+            event_id, candidate_ids, candidate_docs, query_text
+        )
 
         for i, face_id in enumerate(candidate_ids):
-            candidates[face_id]["bm25_score"] = bm25_scores[i]
+            candidates[face_id]["bm25_score"] = bm25_scores[i] if bm25_scores is not None else 0.0
             candidates[face_id]["bm25_rank"] = 0  # will be set below
 
         # Compute BM25 ranks
@@ -153,6 +204,9 @@ class SearchService:
             candidates[fid]["bm25_rank"] = rank
 
         # ── Stage 3: Reciprocal Rank Fusion + quality boost ──────────
+        # Maximum possible RRF score (rank 0): 1/RRF_K
+        max_rrf = 1.0 / self.RRF_K
+
         for face_id, cand in candidates.items():
             # RRF score (higher is better)
             vector_rrf = 1.0 / (self.RRF_K + cand["vector_rank"])
@@ -165,14 +219,23 @@ class SearchService:
             # Quality boost from metadata
             quality_boost = self._compute_quality_boost(cand["metadata"])
 
-            # Composite score: blend of vector similarity and RRF, boosted by quality
-            # Base: vector similarity (strongest signal)
-            # Modifier: RRF normalized + quality boost
-            base_score = cand["vector_similarity"]
-            rrf_modifier = rrf_score * 50  # scale RRF to ~0-1 range
-            quality_modifier = 1.0 + (self.QUALITY_BOOST_WEIGHT * quality_boost)
+            # Additive composite: vector similarity is dominant, RRF and quality
+            # are bounded adjustments. All components normalized to [0,1].
+            rrf_normalized = rrf_score / max_rrf if max_rrf > 0 else 0.0
+            quality_normalized = (quality_boost + 1.0) / 2.0  # shift [-1,1] to [0,1]
 
-            cand["composite_score"] = base_score * quality_modifier * (1.0 + rrf_modifier * 0.05)
+            if bm25_scores is not None:
+                cand["composite_score"] = max(0.0, min(1.0,
+                    0.80 * cand["vector_similarity"]
+                    + 0.12 * rrf_normalized
+                    + 0.08 * quality_normalized
+                ))
+            else:
+                # No BM25 data — vector-only scoring with quality
+                cand["composite_score"] = max(0.0, min(1.0,
+                    0.90 * cand["vector_similarity"]
+                    + 0.10 * quality_normalized
+                ))
 
         # ── Stage 4: Adaptive reranking from feedback ────────────────
         personal_negatives = feedback_service.get_hard_negatives(event_id, selfie_hash)
@@ -223,16 +286,22 @@ class SearchService:
                 penalty += reputation_penalties.get(face_id, 0.0)
 
                 cand["feedback_penalty"] = round(penalty, 4)
-                cand["composite_score"] = max(0.0, cand["composite_score"] + penalty)
+                cand["composite_score"] = max(1e-6, cand["composite_score"] + penalty)
         else:
             for cand in candidates.values():
                 cand["feedback_penalty"] = 0.0
 
         # ── Deduplicate by image_id, keep best face per image ────────
+        # Batch lookup: single query instead of N individual queries
+        face_lookup = {
+            f.embedding_id: f
+            for f in Face.query.filter(Face.embedding_id.in_(all_candidate_ids)).all()
+        }
+
         excluded = set(excluded_image_ids or [])
         image_best = {}
         for face_id, cand in candidates.items():
-            face = Face.query.filter_by(embedding_id=face_id).first()
+            face = face_lookup.get(face_id)
             if not face:
                 continue
 
@@ -265,14 +334,24 @@ class SearchService:
         feedback_stats = feedback_service.get_feedback_stats(event_id, selfie_hash)
 
         # ── Filter by threshold and build response ───────────────────
+        # Batch load images instead of N individual queries
+        image_ids_to_load = [
+            img_id for img_id, match in image_best.items()
+            if match["score"] >= threshold
+        ]
+        images_by_id = {
+            img.id: img
+            for img in Image.query.filter(Image.id.in_(image_ids_to_load)).all()
+        } if image_ids_to_load else {}
+
         results = []
         for image_id, match in sorted(
             image_best.items(), key=lambda x: x[1]["score"], reverse=True
         ):
-            if match["vector_sim"] < threshold:
+            if match["score"] < threshold:
                 continue
 
-            image = Image.query.get(image_id)
+            image = images_by_id.get(image_id)
             if not image:
                 continue
 
@@ -303,23 +382,202 @@ class SearchService:
             "feedback_stats": feedback_stats,
         }
 
+    def search_by_metadata(
+        self,
+        event_id: str,
+        query_text: str,
+        metadata_filters: dict | None = None,
+        max_results: int = 100,
+    ) -> dict:
+        """Search by metadata/scene only (no face matching).
+
+        Used for natural language queries like "dancing photos at night"
+        without a selfie upload.
+        """
+        # Get all documents from the event for BM25 ranking
+        all_docs = vector_service.get_all_documents(event_id)
+        if not all_docs["ids"]:
+            return {"results": [], "count": 0}
+
+        doc_ids = all_docs["ids"]
+        documents = all_docs.get("documents", [""] * len(doc_ids))
+        metadatas = all_docs.get("metadatas", [{}] * len(doc_ids))
+
+        # BM25 score all documents against query
+        bm25_scores = self._bm25_rescore(documents, query_text)
+        if bm25_scores is None:
+            return {"results": [], "count": 0}
+
+        # Build scored candidates
+        scored = []
+        for i, doc_id in enumerate(doc_ids):
+            meta = metadatas[i] if i < len(metadatas) else {}
+
+            # Apply metadata filters if provided
+            if metadata_filters:
+                skip = False
+                for key, value in metadata_filters.items():
+                    if meta.get(key) != value:
+                        skip = True
+                        break
+                if skip:
+                    continue
+
+            scored.append({
+                "embedding_id": doc_id,
+                "bm25_score": bm25_scores[i],
+                "metadata": meta,
+            })
+
+        # Sort by BM25 score
+        scored.sort(key=lambda x: x["bm25_score"], reverse=True)
+        scored = scored[:max_results]
+
+        # Resolve to images via Face table
+        embedding_ids = [s["embedding_id"] for s in scored]
+        face_lookup = {
+            f.embedding_id: f
+            for f in Face.query.filter(Face.embedding_id.in_(embedding_ids)).all()
+        }
+
+        image_ids = list({
+            face_lookup[s["embedding_id"]].image_id
+            for s in scored
+            if s["embedding_id"] in face_lookup
+        })
+        images_by_id = {
+            img.id: img
+            for img in Image.query.filter(Image.id.in_(image_ids)).all()
+        }
+
+        results = []
+        seen_images = set()
+        for s in scored:
+            face = face_lookup.get(s["embedding_id"])
+            if not face or face.image_id in seen_images:
+                continue
+            seen_images.add(face.image_id)
+
+            image = images_by_id.get(face.image_id)
+            if not image:
+                continue
+
+            results.append({
+                "image": image.to_dict(),
+                "relevance_score": round(s["bm25_score"], 4),
+                "match_details": {
+                    "scene_type": s["metadata"].get("scene_type"),
+                    "face_quality": s["metadata"].get("face_quality"),
+                },
+            })
+
+        return {"results": results, "count": len(results)}
+
+    def _bm25_rescore_cached(
+        self,
+        event_id: str,
+        candidate_ids: list[str],
+        candidate_docs: list[str],
+        query_text: str,
+    ) -> list[float] | None:
+        """BM25 scoring with per-event index caching.
+
+        Builds BM25 index over the full event corpus (not just vector recall
+        candidates) for better ranking, then scores only the candidates.
+        """
+        if not query_text or not query_text.strip():
+            return None
+
+        with _bm25_lock:
+            cached = _bm25_cache.get(event_id)
+
+        # Try to use cached full-corpus BM25 index
+        if cached:
+            cached_count, bm25, cached_ids = cached
+            # Verify cache is still valid (doc count hasn't changed)
+            all_docs = vector_service.get_all_documents(event_id)
+            current_count = len(all_docs.get("ids", []))
+            if current_count == cached_count:
+                # Score candidates against cached index
+                return self._score_candidates_with_bm25(
+                    bm25, cached_ids, candidate_ids, query_text
+                )
+
+        # Cache miss or stale — rebuild from full corpus
+        all_docs = vector_service.get_all_documents(event_id)
+        all_ids = all_docs.get("ids", [])
+        all_documents = all_docs.get("documents", [])
+
+        if not all_ids or not all_documents:
+            # Fall back to candidate-only BM25
+            return self._bm25_rescore(candidate_docs, query_text)
+
+        tokenized = [doc.lower().split() if doc else [] for doc in all_documents]
+        if all(len(d) == 0 for d in tokenized):
+            return None
+
+        bm25 = BM25Okapi(tokenized)
+
+        with _bm25_lock:
+            _bm25_cache[event_id] = (len(all_ids), bm25, all_ids)
+
+        return self._score_candidates_with_bm25(
+            bm25, all_ids, candidate_ids, query_text
+        )
+
+    def _score_candidates_with_bm25(
+        self,
+        bm25: BM25Okapi,
+        corpus_ids: list[str],
+        candidate_ids: list[str],
+        query_text: str,
+    ) -> list[float] | None:
+        """Score specific candidates against a pre-built BM25 index."""
+        query_tokens = query_text.lower().split()
+        if not query_tokens:
+            return None
+
+        all_scores = bm25.get_scores(query_tokens)
+
+        # Map corpus positions to IDs
+        id_to_score = {}
+        for i, cid in enumerate(corpus_ids):
+            id_to_score[cid] = all_scores[i]
+
+        # Extract scores for just the candidates
+        scores = [id_to_score.get(cid, 0.0) for cid in candidate_ids]
+
+        # Normalize to 0-1
+        max_score = max(scores) if scores else 1.0
+        if max_score > 0:
+            scores = [s / max_score for s in scores]
+
+        return scores
+
     def _bm25_rescore(
         self, candidate_docs: list[str], query_text: str
-    ) -> list[float]:
+    ) -> list[float] | None:
         """Score candidate documents against query using BM25.
 
-        Tokenizes on whitespace. Returns normalized scores (0-1).
+        Tokenizes on whitespace. Returns normalized scores (0-1),
+        or None if BM25 scoring is not possible (empty query/docs).
         """
-        if not candidate_docs or not query_text:
-            return [0.0] * len(candidate_docs)
+        if not query_text or not query_text.strip():
+            return None
+
+        if not candidate_docs:
+            return None
 
         # Tokenize
         tokenized_docs = [doc.lower().split() for doc in candidate_docs]
         query_tokens = query_text.lower().split()
 
+        if not query_tokens:
+            return None
+
         # Handle empty tokenized docs
         if all(len(d) == 0 for d in tokenized_docs):
-            return [0.0] * len(candidate_docs)
+            return None
 
         # Build BM25 index
         bm25 = BM25Okapi(tokenized_docs)
