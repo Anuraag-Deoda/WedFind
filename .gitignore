@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+__pycache__/
+*.pyc
+*.egg-info/
+venv/
+
+# Build
+.next/
+out/
+dist/
+build/
+
+# Environment
+.env
+.env.local
+.env.production
+
+# Storage & data (bind-mounted volumes)
+backend/storage/originals/
+backend/storage/processed/
+backend/storage/thumbnails/
+backend/storage/selfies/
+backend/chromadb_data/
+backend/data/
+*.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Logs
+*.log
+
+# InsightFace models
+models/
+.insightface/
+
+# Docker
+celerybeat-schedule

@@ -1,0 +1,146 @@
+services:
+  # ── Next.js frontend ───────────────────────────────────────────────
+  frontend:
+    build: ./frontend
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+    depends_on:
+      flask:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--spider", "http://localhost:8080/new-app"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+
+  # ── Flask API server ───────────────────────────────────────────────
+  flask:
+    build: ./backend
+    image: camera-backend
+    ports:
+      - "8888:8888"
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - SECRET_KEY=${SECRET_KEY:-dev-secret-change-in-production}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - RATELIMIT_STORAGE_URI=redis://redis:6379/1
+      - STORAGE_DIR=/app/storage
+      - CHROMADB_DIR=/app/chromadb_data
+      - DATABASE_URL=sqlite:////app/data/app.db
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+      - CORS_ORIGINS=https://staging.brinx.ai
+    volumes:
+      - /home/ec2-user/app/images:/app/storage
+      - /home/ec2-user/app/db:/app/data
+      - /home/ec2-user/app/chromadb:/app/chromadb_data
+      - insightface_cache:/app/.insightface
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8888/api/health/live')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 120s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 3G
+
+  # ── Celery worker (CPU-intensive face processing) ──────────────────
+  celery-worker:
+    image: camera-backend
+    command: celery -A app.tasks.celery_app:celery worker --loglevel=info --concurrency=2
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      - FLASK_ENV=${FLASK_ENV:-production}
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - STORAGE_DIR=/app/storage
+      - CHROMADB_DIR=/app/chromadb_data
+      - DATABASE_URL=sqlite:////app/data/app.db
+      - LOG_FORMAT=${LOG_FORMAT:-json}
+    volumes:
+      - /home/ec2-user/app/images:/app/storage
+      - /home/ec2-user/app/db:/app/data
+      - /home/ec2-user/app/chromadb:/app/chromadb_data
+      - insightface_cache:/app/.insightface
+    depends_on:
+      flask:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "celery", "-A", "app.tasks.celery_app:celery", "inspect", "ping", "--timeout", "5"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+
+  # ── Celery beat (scheduled tasks) ──────────────────────────────────
+  celery-beat:
+    image: camera-backend
+    command: celery -A app.tasks.celery_app:celery beat --loglevel=info --schedule=/tmp/celerybeat-schedule
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+    depends_on:
+      flask:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.25"
+          memory: 128M
+
+  # ── Redis ──────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru --appendonly yes
+    expose:
+      - "6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 512M
+
+volumes:
+  redis_data:
+  insightface_cache:

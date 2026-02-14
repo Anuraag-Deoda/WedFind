@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+@theme {
+  --color-cream: #faf8f5;
+  --color-warm-50: #fdfcfb;
+  --color-warm-100: #f5f0eb;
+  --color-warm-200: #e8dfd6;
+  --color-warm-300: #d4c5b5;
+  --color-warm-400: #b8a48e;
+  --color-warm-500: #9c836a;
+  --color-warm-600: #7a6550;
+  --color-warm-700: #5c4b3c;
+  --color-warm-800: #3d3228;
+  --color-warm-900: #1f1a14;
+  --color-rose-accent: #c47d7d;
+  --color-sage: #8a9a7b;
+  --color-gold: #c4a265;
+}
