@@ -1,9 +1,15 @@
-FROM python:3.11-slim AS base
+FROM python:3.10-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 WORKDIR /app
 
 # System dependencies for OpenCV, InsightFace, python-magic
 RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    g++ \
+    cmake \
+    python3-dev \
     libgl1 \
     libglib2.0-0 \
     libmagic1 \
@@ -17,11 +23,11 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
-# Create storage directories
+# Create storage and cache directories
 RUN mkdir -p storage/originals storage/processed storage/thumbnails storage/selfies \
-    chromadb_data data
+    chromadb_data data .insightface
 
-# Create non-root user
+# Create non-root user and own everything
 RUN groupadd -r appuser && useradd -r -g appuser -d /app appuser \
     && chown -R appuser:appuser /app
 
