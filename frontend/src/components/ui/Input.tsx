@@ -9,11 +9,11 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 
 export function Input({ label, error, className, id, ...props }: InputProps) {
   return (
-    <div className="space-y-1.5">
+    <div className="space-y-2">
       {label && (
         <label
           htmlFor={id}
-          className="block text-sm font-medium text-warm-700"
+          className="block text-xs font-medium text-warm-500 uppercase tracking-wider"
         >
           {label}
         </label>
@@ -21,13 +21,13 @@ export function Input({ label, error, className, id, ...props }: InputProps) {
       <input
         id={id}
         className={cn(
-          "w-full rounded-xl border border-warm-200 bg-white px-4 py-2.5 text-warm-900 placeholder-warm-400 transition-colors focus:border-warm-500 focus:outline-none focus:ring-2 focus:ring-warm-500/20",
-          error && "border-red-400 focus:border-red-500 focus:ring-red-500/20",
+          "w-full rounded-2xl border border-warm-200/80 bg-white/80 backdrop-blur-sm px-4 py-3 text-warm-900 placeholder-warm-300 transition-all focus:border-warm-400 focus:outline-none focus:ring-2 focus:ring-warm-500/15 focus:bg-white shadow-sm",
+          error && "border-red-300 focus:border-red-400 focus:ring-red-500/15",
           className
         )}
         {...props}
       />
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
     </div>
   );
 }
