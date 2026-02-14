@@ -22,11 +22,11 @@ export function Button({
 
   const variants = {
     primary:
-      "bg-gradient-to-b from-warm-700 to-warm-800 text-cream hover:from-warm-600 hover:to-warm-700 focus-visible:ring-warm-500 shadow-md shadow-warm-900/15 hover:shadow-lg hover:shadow-warm-900/20",
+      "bg-gradient-to-b from-gradient-purple to-warm-800 text-white hover:from-warm-600 hover:to-gradient-purple focus-visible:ring-gradient-purple shadow-md shadow-gradient-purple/20 hover:shadow-lg hover:shadow-gradient-purple/30",
     secondary:
-      "bg-white/80 backdrop-blur-sm text-warm-800 hover:bg-white focus-visible:ring-warm-400 border border-warm-200/80 shadow-sm hover:shadow-md",
+      "bg-white/70 backdrop-blur-sm text-warm-800 hover:bg-white focus-visible:ring-warm-400 border border-warm-200/60 shadow-sm hover:shadow-md",
     ghost:
-      "text-warm-500 hover:text-warm-800 hover:bg-warm-100/60 focus-visible:ring-warm-300",
+      "text-warm-500 hover:text-warm-800 hover:bg-warm-100/50 focus-visible:ring-warm-300",
     danger:
       "bg-gradient-to-b from-red-500 to-red-600 text-white hover:from-red-400 hover:to-red-500 focus-visible:ring-red-500 shadow-md shadow-red-600/20",
   };

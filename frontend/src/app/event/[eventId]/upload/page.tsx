@@ -66,21 +66,30 @@ export default function UploadPage() {
     <div className="min-h-screen py-12 px-4 relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-[400px] h-[400px] bg-gradient-pink/15 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-sage/6 rounded-full blur-3xl" />
-        <div className="absolute top-[12%] right-[15%] w-1 h-1 bg-gradient-purple/30 rounded-full animate-sparkle" />
+        <div className="absolute -top-48 -right-48 w-[550px] h-[550px] bg-gradient-pink/22 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-40 -left-40 w-[450px] h-[450px] bg-gradient-blue/10 rounded-full blur-[100px]" />
+        <div className="absolute top-1/2 right-1/4 w-[300px] h-[300px] bg-gradient-purple/8 rounded-full blur-[100px]" />
+        <div className="absolute top-[12%] right-[15%] w-1.5 h-1.5 bg-gradient-purple/45 rounded-full animate-sparkle" />
+        <div className="absolute bottom-[25%] left-[10%] w-1 h-1 bg-rose-accent/30 rounded-full animate-sparkle" style={{ animationDelay: "1.1s" }} />
       </div>
       <div className="max-w-2xl mx-auto space-y-8 relative z-10">
-        <div className="flex items-center justify-between">
-          <div>
-            <Link
-              href={`/event/${eventId}`}
-              className="text-sm text-warm-500 hover:text-warm-700 mb-1 inline-block"
-            >
-              &larr; Back to event
-            </Link>
-            <h1 className="text-2xl font-bold text-warm-900">Upload Photos</h1>
-          </div>
+        <div className="animate-fade-in">
+          <Link
+            href={`/event/${eventId}`}
+            className="inline-flex items-center gap-1.5 text-sm text-warm-400 hover:text-warm-600 transition-colors mb-3"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+            Back
+          </Link>
+          <h1
+            className="text-2xl sm:text-3xl font-bold text-warm-900 tracking-tight"
+            style={{ fontFamily: "'Poppins', sans-serif" }}
+          >
+            Upload Photos
+          </h1>
+          <p className="text-warm-500 mt-1">Share photos from the event</p>
         </div>
 
         {/* ── File selection (before upload starts) ─────────────────── */}
@@ -153,7 +162,7 @@ export default function UploadPage() {
 
         {/* ── Upload progress (during upload) ───────────────────────── */}
         {uploading && progress && (
-          <div className="space-y-5 p-6 bg-warm-50 rounded-xl border border-warm-100">
+          <div className="space-y-5 p-6 glass rounded-2xl">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold text-warm-900">
                 Uploading Photos
@@ -205,7 +214,7 @@ export default function UploadPage() {
         {/* ── Results (after upload) ────────────────────────────────── */}
         {result && (
           <div className="space-y-6">
-            <div className="text-center p-6 bg-warm-50 rounded-xl border border-warm-100">
+            <div className="text-center p-6 glass rounded-2xl">
               <p className="text-warm-800 font-medium">
                 {result.images_accepted} photo
                 {result.images_accepted !== 1 ? "s" : ""} uploaded successfully!
@@ -226,7 +235,7 @@ export default function UploadPage() {
 
             {/* Processing progress */}
             {totalImages > 0 && !processingDone && (
-              <div className="space-y-3 p-5 bg-warm-50 rounded-xl border border-warm-100">
+              <div className="space-y-3 p-5 glass rounded-2xl">
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-medium text-warm-800">
                     Processing photos ({processedCount}/{totalImages})
@@ -246,8 +255,8 @@ export default function UploadPage() {
             )}
 
             {processingDone && (
-              <div className="p-4 bg-green-50 rounded-xl border border-green-100 text-center">
-                <p className="text-green-800 font-medium">
+              <div className="p-4 bg-sage/10 rounded-2xl border border-sage/20 text-center">
+                <p className="text-warm-700 font-medium">
                   All photos processed!
                 </p>
               </div>

@@ -29,10 +29,10 @@ export function DropZone({
   return (
     <div
       className={cn(
-        "relative border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-200",
+        "relative border-2 border-dashed rounded-2xl p-12 text-center cursor-pointer transition-all duration-300",
         dragOver
-          ? "border-warm-500 bg-warm-50 scale-[1.01]"
-          : "border-warm-200 hover:border-warm-400 hover:bg-warm-50/50"
+          ? "border-gradient-purple/50 bg-gradient-purple/5 scale-[1.01]"
+          : "border-warm-200/60 hover:border-warm-300 hover:bg-white/40 glass"
       )}
       onDragOver={(e) => {
         e.preventDefault();

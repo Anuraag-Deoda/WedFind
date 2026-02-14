@@ -69,18 +69,23 @@ export default function AdminEventPage() {
   return (
     <div className="min-h-screen py-12 px-4 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-[400px] h-[400px] bg-gradient-pink/12 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-gradient-purple/6 rounded-full blur-3xl" />
+        <div className="absolute -top-48 -right-48 w-[500px] h-[500px] bg-gradient-pink/18 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] bg-gradient-purple/8 rounded-full blur-[100px]" />
+        <div className="absolute top-1/2 right-1/3 w-[300px] h-[300px] bg-gradient-blue/6 rounded-full blur-[100px]" />
+        <div className="absolute top-[18%] right-[14%] w-1.5 h-1.5 bg-gradient-purple/40 rounded-full animate-sparkle" />
       </div>
       <div className="max-w-3xl mx-auto space-y-8 relative z-10">
         <div>
           <Link
             href="/admin/dashboard"
-            className="text-sm text-warm-500 hover:text-warm-700 mb-1 inline-block"
+            className="inline-flex items-center gap-1.5 text-sm text-warm-400 hover:text-warm-600 transition-colors mb-3"
           >
-            &larr; Back to dashboard
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+            </svg>
+            Back
           </Link>
-          <h1 className="text-2xl font-bold text-warm-900" style={{ fontFamily: "'Poppins', sans-serif" }}>{event.name}</h1>
+          <h1 className="text-2xl sm:text-3xl font-bold text-warm-900 tracking-tight" style={{ fontFamily: "'Poppins', sans-serif" }}>{event.name}</h1>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -90,7 +95,7 @@ export default function AdminEventPage() {
           <StatCard label="Storage" value={formatBytes(stats.storage_used_bytes)} />
         </div>
 
-        <div className="p-6 bg-warm-50 rounded-xl border border-warm-100 space-y-3">
+        <div className="p-6 glass rounded-2xl space-y-3">
           <h2 className="font-medium text-warm-800">Event Details</h2>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
@@ -143,7 +148,7 @@ function StatCard({
   value: number | string;
 }) {
   return (
-    <div className="p-4 bg-white rounded-xl border border-warm-100">
+    <div className="p-4 glass rounded-2xl">
       <p className="text-sm text-warm-500">{label}</p>
       <p className="text-2xl font-bold text-warm-900 mt-1">{value}</p>
     </div>

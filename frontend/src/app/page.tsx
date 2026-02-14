@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Button } from "@/components/ui/Button";
 import { lookupEvent } from "@/lib/api";
 
@@ -31,52 +30,60 @@ export default function LandingPage() {
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden">
-      {/* Animated gradient background orbs */}
+      {/* ── Background mesh ─────────────────────────────────── */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-pink/25 rounded-full blur-3xl" />
-        <div className="absolute top-1/3 -left-40 w-[400px] h-[400px] bg-gradient-purple/12 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 right-1/4 w-[450px] h-[450px] bg-sage/8 rounded-full blur-3xl" />
+        {/* Large soft orbs matching logo palette */}
+        <div className="absolute -top-48 -right-48 w-[600px] h-[600px] rounded-full bg-gradient-pink/30 blur-[120px]" />
+        <div className="absolute top-1/4 -left-48 w-[500px] h-[500px] rounded-full bg-gradient-purple/14 blur-[100px]" />
+        <div className="absolute -bottom-48 right-1/4 w-[550px] h-[550px] rounded-full bg-gradient-blue/10 blur-[120px]" />
 
-        {/* Sparkle particles */}
-        <div className="absolute top-[15%] right-[20%] w-2 h-2 bg-gradient-purple/40 rounded-full animate-sparkle" />
-        <div className="absolute top-[40%] left-[15%] w-1.5 h-1.5 bg-rose-accent/30 rounded-full animate-sparkle" style={{ animationDelay: "1s" }} />
-        <div className="absolute bottom-[30%] right-[30%] w-1 h-1 bg-sage/40 rounded-full animate-sparkle" style={{ animationDelay: "2s" }} />
-        <div className="absolute top-[60%] right-[10%] w-1.5 h-1.5 bg-gold/30 rounded-full animate-sparkle" style={{ animationDelay: "0.5s" }} />
-        <div className="absolute top-[25%] left-[30%] w-1 h-1 bg-gradient-purple/30 rounded-full animate-sparkle" style={{ animationDelay: "1.5s" }} />
+        {/* Sparkle dots */}
+        <div className="absolute top-[12%] right-[18%] w-1.5 h-1.5 rounded-full bg-gradient-purple/50 animate-sparkle" />
+        <div className="absolute top-[38%] left-[12%] w-2 h-2 rounded-full bg-rose-accent/35 animate-sparkle" style={{ animationDelay: "0.8s" }} />
+        <div className="absolute bottom-[28%] right-[28%] w-1 h-1 rounded-full bg-sage/50 animate-sparkle" style={{ animationDelay: "1.6s" }} />
+        <div className="absolute top-[58%] right-[8%] w-1.5 h-1.5 rounded-full bg-gold/35 animate-sparkle" style={{ animationDelay: "0.4s" }} />
+        <div className="absolute top-[22%] left-[28%] w-1 h-1 rounded-full bg-gradient-purple/35 animate-sparkle" style={{ animationDelay: "1.2s" }} />
+        <div className="absolute bottom-[42%] left-[8%] w-1 h-1 rounded-full bg-rose-accent/25 animate-sparkle" style={{ animationDelay: "2s" }} />
       </div>
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-10">
-        <div className="w-full max-w-sm space-y-10">
-          {/* Logo & branding */}
+      {/* ── Main content ────────────────────────────────────── */}
+      <div className="flex-1 flex flex-col items-center justify-center px-5 relative z-10">
+        <div className="w-full max-w-sm space-y-12">
+
+          {/* Brand block */}
           <div className="text-center animate-fade-in">
-            <div className="mx-auto w-32 h-32 mb-6 relative">
-              <div className="absolute inset-0 bg-gradient-purple/20 rounded-full blur-2xl animate-glow-pulse" />
-              <Image
-                src="/logo.png"
-                alt="Brinx Photos"
-                width={128}
-                height={128}
-                className="w-full h-full object-contain relative z-10 drop-shadow-lg"
-                priority
+            {/* Logo with glow */}
+            <div className="relative mx-auto w-36 h-36 mb-8">
+              <div className="absolute inset-[-20%] rounded-full bg-gradient-purple/25 blur-3xl animate-glow-pulse" />
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/new-app/logo.png"
+                alt="WedFind"
+                width={144}
+                height={144}
+                className="relative z-10 w-full h-full object-contain drop-shadow-xl"
               />
             </div>
+
             <h1
-              className="text-4xl font-extrabold tracking-tight gradient-text"
+              className="text-5xl sm:text-6xl font-extrabold tracking-tight gradient-text leading-[1.1]"
               style={{ fontFamily: "'Poppins', sans-serif" }}
             >
-              Brinx Photos
+              WedFind
             </h1>
-            <p className="text-warm-400 text-base mt-3 max-w-xs mx-auto leading-relaxed">
-              Find every photo you&apos;re in with AI-powered face recognition
+            <p className="text-warm-400 text-base sm:text-lg mt-4 max-w-xs mx-auto leading-relaxed">
+              AI-powered wedding photo discovery
             </p>
           </div>
 
-          {/* Code input card */}
+          {/* Input card */}
           <div className="animate-slide-up stagger-1">
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="bg-white/60 backdrop-blur-xl rounded-2xl p-6 shadow-lg shadow-warm-700/5 border border-warm-200/50">
-                <label htmlFor="code" className="block text-xs font-medium text-warm-500 uppercase tracking-wider mb-2">
+            <form onSubmit={handleSubmit} className="space-y-5">
+              <div className="glass rounded-3xl p-7 shadow-lg shadow-warm-800/5">
+                <label
+                  htmlFor="code"
+                  className="block text-[11px] font-semibold text-warm-400 uppercase tracking-[0.15em] mb-3"
+                >
                   Event Code
                 </label>
                 <input
@@ -88,28 +95,28 @@ export default function LandingPage() {
                     setCode(e.target.value.toUpperCase());
                     setError("");
                   }}
-                  className="w-full text-center text-2xl tracking-[0.3em] font-semibold text-warm-900 bg-transparent border-b-2 border-warm-200 focus:border-gradient-purple outline-none py-3 placeholder-warm-300 uppercase transition-colors"
+                  className="w-full text-center text-2xl sm:text-3xl tracking-[0.35em] font-bold text-warm-900 bg-transparent border-b-2 border-warm-200 focus:border-gradient-purple outline-none py-3 placeholder-warm-300/60 uppercase transition-colors duration-300"
                   autoComplete="off"
                   autoFocus
                 />
                 {error && (
-                  <p className="text-sm text-rose-accent mt-3 text-center">{error}</p>
+                  <p className="text-sm text-rose-accent mt-3 text-center font-medium">{error}</p>
                 )}
               </div>
 
               <Button
                 type="submit"
                 loading={loading}
-                className="w-full glow-primary"
+                className="w-full glow-purple"
                 size="lg"
                 disabled={!code.trim()}
               >
-                Join Event
+                Find My Photos
               </Button>
             </form>
           </div>
 
-          {/* Bottom hint */}
+          {/* Hint */}
           <p className="text-center text-sm text-warm-300 animate-slide-up stagger-2">
             Ask your photographer for the event code
           </p>
@@ -117,8 +124,8 @@ export default function LandingPage() {
       </div>
 
       {/* Footer */}
-      <div className="py-4 text-center relative z-10">
-        <p className="text-xs text-warm-300">Powered by Brinx AI</p>
+      <div className="py-5 text-center relative z-10">
+        <p className="text-[11px] text-warm-300/70 tracking-wide">Powered by WedFind AI</p>
       </div>
     </div>
   );

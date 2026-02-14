@@ -33,8 +33,9 @@ export default function AdminLoginPage() {
   return (
     <div className="min-h-screen flex items-center justify-center px-4 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-32 -right-32 w-96 h-96 bg-gradient-pink/15 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-gradient-purple/8 rounded-full blur-3xl" />
+        <div className="absolute -top-48 -right-48 w-[500px] h-[500px] bg-gradient-pink/20 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] bg-gradient-purple/10 rounded-full blur-[100px]" />
+        <div className="absolute top-[20%] right-[15%] w-1.5 h-1.5 bg-gradient-purple/40 rounded-full animate-sparkle" />
       </div>
       <div className="w-full max-w-sm space-y-6 relative z-10">
         <div className="text-center">

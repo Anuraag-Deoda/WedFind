@@ -76,8 +76,10 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen py-12 px-4 relative overflow-hidden">
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-[400px] h-[400px] bg-gradient-pink/12 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-gradient-purple/6 rounded-full blur-3xl" />
+        <div className="absolute -top-48 -right-48 w-[550px] h-[550px] bg-gradient-pink/18 rounded-full blur-[120px]" />
+        <div className="absolute -bottom-40 -left-40 w-[400px] h-[400px] bg-gradient-purple/8 rounded-full blur-[100px]" />
+        <div className="absolute top-1/2 right-1/4 w-[300px] h-[300px] bg-gradient-blue/6 rounded-full blur-[100px]" />
+        <div className="absolute top-[15%] right-[12%] w-1.5 h-1.5 bg-gradient-purple/40 rounded-full animate-sparkle" />
       </div>
       <div className="max-w-4xl mx-auto space-y-8 relative z-10">
         <div className="flex items-center justify-between">
@@ -90,7 +92,7 @@ export default function AdminDashboard() {
         {showCreate && (
           <form
             onSubmit={handleCreate}
-            className="p-6 bg-warm-50 rounded-xl border border-warm-100 space-y-4"
+            className="p-6 glass rounded-2xl space-y-4"
           >
             <Input
               id="event-name"
@@ -121,7 +123,7 @@ export default function AdminDashboard() {
             {events.map((event) => (
               <div
                 key={event.id}
-                className="flex items-center justify-between p-5 bg-white rounded-xl border border-warm-100 hover:border-warm-200 transition-colors"
+                className="flex items-center justify-between p-5 glass rounded-2xl transition-all duration-300 hover:bg-white/70 hover:shadow-md"
               >
                 <div className="min-w-0">
                   <Link
