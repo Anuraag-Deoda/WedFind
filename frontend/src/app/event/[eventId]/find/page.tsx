@@ -87,7 +87,10 @@ export default function FindPage() {
         <div className="min-h-screen relative overflow-hidden">
           {/* Background */}
           <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-warm-200/30 rounded-full blur-3xl" />
+            <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-pink/20 rounded-full blur-3xl" />
+            <div className="absolute bottom-1/3 -left-32 w-[300px] h-[300px] bg-gradient-purple/8 rounded-full blur-3xl" />
+            <div className="absolute top-[18%] right-[12%] w-1.5 h-1.5 bg-gradient-purple/40 rounded-full animate-sparkle" />
+            <div className="absolute bottom-[20%] left-[18%] w-1 h-1 bg-rose-accent/30 rounded-full animate-sparkle" style={{ animationDelay: "1.2s" }} />
           </div>
 
           <div className="relative z-10 py-8 sm:py-12 px-4">
@@ -107,7 +110,7 @@ export default function FindPage() {
                   </Link>
                   <h1
                     className="text-2xl sm:text-3xl font-bold text-warm-900 tracking-tight"
-                    style={{ fontFamily: "'Playfair Display', serif" }}
+                    style={{ fontFamily: "'Poppins', sans-serif" }}
                   >
                     Your Photos
                   </h1>
@@ -153,7 +156,7 @@ export default function FindPage() {
                   step="0.05"
                   value={threshold}
                   onChange={(e) => setThreshold(parseFloat(e.target.value))}
-                  className="flex-1 accent-warm-600 h-1.5"
+                  className="flex-1 accent-gradient-purple h-1.5"
                   aria-label="Match sensitivity threshold"
                 />
                 <span className="text-sm font-mono text-warm-700 w-12 text-right tabular-nums">
@@ -239,8 +242,11 @@ export default function FindPage() {
       <div className="min-h-screen flex flex-col relative overflow-hidden">
         {/* Background */}
         <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-32 -right-32 w-96 h-96 bg-warm-200/40 rounded-full blur-3xl" />
-          <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-gold/10 rounded-full blur-3xl" />
+          <div className="absolute -top-32 -right-32 w-96 h-96 bg-gradient-pink/25 rounded-full blur-3xl" />
+          <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-sage/10 rounded-full blur-3xl" />
+          <div className="absolute top-1/2 left-1/4 w-[250px] h-[250px] bg-gradient-purple/8 rounded-full blur-3xl" />
+          <div className="absolute top-[20%] right-[18%] w-1.5 h-1.5 bg-gradient-purple/40 rounded-full animate-sparkle" />
+          <div className="absolute bottom-[35%] left-[12%] w-1 h-1 bg-rose-accent/30 rounded-full animate-sparkle" style={{ animationDelay: "1s" }} />
         </div>
 
         <div className="flex-1 flex flex-col items-center justify-center px-4 relative z-10 py-12">
@@ -259,7 +265,7 @@ export default function FindPage() {
               </Link>
               <h1
                 className="text-2xl sm:text-3xl font-bold text-warm-900 tracking-tight"
-                style={{ fontFamily: "'Playfair Display', serif" }}
+                style={{ fontFamily: "'Poppins', sans-serif" }}
               >
                 Find My Photos
               </h1>
@@ -270,7 +276,7 @@ export default function FindPage() {
 
             {searching ? (
               <div className="text-center py-16 space-y-5 animate-fade-in" role="status">
-                <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-warm-100 to-warm-200 flex items-center justify-center">
+                <div className="w-20 h-20 mx-auto rounded-3xl bg-gradient-to-br from-warm-100 to-warm-200/80 flex items-center justify-center">
                   <Spinner size="lg" />
                 </div>
                 <div>
@@ -285,20 +291,20 @@ export default function FindPage() {
                     {/* Camera button as hero card */}
                     <button
                       onClick={() => setMode("camera")}
-                      className="w-full group relative overflow-hidden rounded-2xl bg-gradient-to-br from-warm-800 to-warm-900 p-6 shadow-lg shadow-warm-900/15 transition-all duration-300 hover:shadow-xl hover:scale-[1.01] active:scale-[0.99] text-left"
+                      className="w-full group relative overflow-hidden rounded-2xl bg-gradient-to-br from-gradient-purple to-warm-900 p-6 shadow-lg shadow-gradient-purple/20 transition-all duration-300 hover:shadow-xl hover:shadow-gradient-purple/30 hover:scale-[1.01] active:scale-[0.99] text-left"
                     >
                       <div className="flex items-center gap-4">
-                        <div className="w-14 h-14 rounded-2xl bg-white/10 flex items-center justify-center shrink-0">
-                          <svg className="w-7 h-7 text-cream" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <div className="w-14 h-14 rounded-2xl bg-white/15 flex items-center justify-center shrink-0">
+                          <svg className="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 015.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 00-1.134-.175 2.31 2.31 0 01-1.64-1.055l-.822-1.316a2.192 2.192 0 00-1.736-1.039 48.774 48.774 0 00-5.232 0 2.192 2.192 0 00-1.736 1.039l-.821 1.316z" />
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 11-9 0 4.5 4.5 0 019 0z" />
                           </svg>
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-lg font-semibold text-cream">Take a Selfie</p>
-                          <p className="text-sm text-warm-300 mt-0.5">Quick snap with your camera</p>
+                          <p className="text-lg font-semibold text-white">Take a Selfie</p>
+                          <p className="text-sm text-white/60 mt-0.5">Quick snap with your camera</p>
                         </div>
-                        <svg className="w-5 h-5 text-warm-400 group-hover:translate-x-1 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <svg className="w-5 h-5 text-white/40 group-hover:translate-x-1 transition-transform shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
                         </svg>
                       </div>
@@ -307,7 +313,7 @@ export default function FindPage() {
                     {/* Upload button */}
                     <button
                       onClick={() => setMode("upload")}
-                      className="w-full group rounded-2xl bg-white/70 backdrop-blur-sm p-5 border border-warm-100 transition-all duration-300 hover:bg-white hover:shadow-md hover:scale-[1.01] active:scale-[0.99] text-left"
+                      className="w-full group rounded-2xl bg-white/60 backdrop-blur-sm p-5 border border-warm-200/50 transition-all duration-300 hover:bg-white/80 hover:shadow-md hover:scale-[1.01] active:scale-[0.99] text-left"
                     >
                       <div className="flex items-center gap-4">
                         <div className="w-12 h-12 rounded-xl bg-warm-100 flex items-center justify-center shrink-0">

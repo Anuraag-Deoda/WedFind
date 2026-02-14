@@ -63,8 +63,14 @@ export default function UploadPage() {
       : 0;
 
   return (
-    <div className="min-h-screen py-12 px-4">
-      <div className="max-w-2xl mx-auto space-y-8">
+    <div className="min-h-screen py-12 px-4 relative overflow-hidden">
+      {/* Background */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-[400px] h-[400px] bg-gradient-pink/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-sage/6 rounded-full blur-3xl" />
+        <div className="absolute top-[12%] right-[15%] w-1 h-1 bg-gradient-purple/30 rounded-full animate-sparkle" />
+      </div>
+      <div className="max-w-2xl mx-auto space-y-8 relative z-10">
         <div className="flex items-center justify-between">
           <div>
             <Link

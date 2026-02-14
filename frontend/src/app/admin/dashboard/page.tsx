@@ -74,10 +74,14 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen py-12 px-4">
-      <div className="max-w-4xl mx-auto space-y-8">
+    <div className="min-h-screen py-12 px-4 relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-[400px] h-[400px] bg-gradient-pink/12 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-gradient-purple/6 rounded-full blur-3xl" />
+      </div>
+      <div className="max-w-4xl mx-auto space-y-8 relative z-10">
         <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-bold text-warm-900">Admin Dashboard</h1>
+          <h1 className="text-2xl font-bold text-warm-900" style={{ fontFamily: "'Poppins', sans-serif" }}>Admin Dashboard</h1>
           <Button onClick={() => setShowCreate(!showCreate)}>
             {showCreate ? "Cancel" : "Create Event"}
           </Button>

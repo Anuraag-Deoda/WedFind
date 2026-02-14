@@ -15,7 +15,7 @@ export default function ResultsPage() {
         </p>
         <Link
           href={`/event/${eventId}/find`}
-          className="inline-block text-warm-700 underline hover:text-warm-900"
+          className="inline-block text-gradient-purple underline hover:text-warm-800"
         >
           Go to Find My Photos
         </Link>

@@ -67,8 +67,12 @@ export default function AdminEventPage() {
   if (!event || !stats) return null;
 
   return (
-    <div className="min-h-screen py-12 px-4">
-      <div className="max-w-3xl mx-auto space-y-8">
+    <div className="min-h-screen py-12 px-4 relative overflow-hidden">
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-[400px] h-[400px] bg-gradient-pink/12 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-gradient-purple/6 rounded-full blur-3xl" />
+      </div>
+      <div className="max-w-3xl mx-auto space-y-8 relative z-10">
         <div>
           <Link
             href="/admin/dashboard"
@@ -76,7 +80,7 @@ export default function AdminEventPage() {
           >
             &larr; Back to dashboard
           </Link>
-          <h1 className="text-2xl font-bold text-warm-900">{event.name}</h1>
+          <h1 className="text-2xl font-bold text-warm-900" style={{ fontFamily: "'Poppins', sans-serif" }}>{event.name}</h1>
         </div>
 
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

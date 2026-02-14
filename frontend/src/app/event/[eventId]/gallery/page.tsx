@@ -63,8 +63,11 @@ export default function GalleryPage() {
     <div className="min-h-screen relative overflow-hidden">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none">
-        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-warm-200/20 rounded-full blur-3xl" />
-        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-gold/8 rounded-full blur-3xl" />
+        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-gradient-pink/15 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-sage/8 rounded-full blur-3xl" />
+        <div className="absolute top-1/3 left-1/4 w-[250px] h-[250px] bg-gradient-purple/6 rounded-full blur-3xl" />
+        <div className="absolute top-[15%] right-[10%] w-1.5 h-1.5 bg-gradient-purple/35 rounded-full animate-sparkle" />
+        <div className="absolute bottom-[30%] left-[15%] w-1 h-1 bg-rose-accent/25 rounded-full animate-sparkle" style={{ animationDelay: "1.3s" }} />
       </div>
 
       <div className="relative z-10 py-8 sm:py-12 px-4">
@@ -82,7 +85,7 @@ export default function GalleryPage() {
             </Link>
             <h1
               className="text-2xl sm:text-3xl font-bold text-warm-900 tracking-tight"
-              style={{ fontFamily: "'Playfair Display', serif" }}
+              style={{ fontFamily: "'Poppins', sans-serif" }}
             >
               All Photos
             </h1>
