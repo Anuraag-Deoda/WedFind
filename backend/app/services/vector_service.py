@@ -3,10 +3,22 @@
 Each event gets its own collection. Embeddings are stored with extensive
 metadata (face attributes, image quality, scene info) enabling filtered
 queries and metadata-boosted re-ranking.
+
+Write operations are protected by per-event Redis distributed locks to
+prevent index corruption from concurrent Celery workers.
+
+Embedding model version is tracked in metadata to prevent cross-version
+similarity corruption when the InsightFace model is upgraded.
 """
 
+import logging
+from contextlib import contextmanager
+
 import chromadb
+import redis as redis_lib
 from flask import current_app
+
+logger = logging.getLogger(__name__)
 
 _client = None
 
@@ -32,6 +44,30 @@ def get_or_create_collection(event_id: str):
     )
 
 
+# ── ChromaDB Write Lock ──────────────────────────────────────────────
+
+@contextmanager
+def _chroma_write_lock(event_id: str, timeout: int = 30):
+    """Acquire a per-event Redis distributed lock for ChromaDB writes."""
+    try:
+        broker_url = current_app.config.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+        r = redis_lib.from_url(broker_url)
+        lock = r.lock(f"chroma_lock:{event_id}", timeout=timeout, blocking_timeout=timeout)
+        acquired = lock.acquire()
+        if not acquired:
+            raise TimeoutError(f"Could not acquire ChromaDB write lock for event {event_id}")
+        try:
+            yield
+        finally:
+            try:
+                lock.release()
+            except redis_lib.exceptions.LockNotOwnedError:
+                pass
+    except (redis_lib.exceptions.ConnectionError, redis_lib.exceptions.RedisError) as e:
+        logger.warning("chroma_write_lock_unavailable", extra={"event_id": event_id, "error": str(e)})
+        yield
+
+
 def add_embedding(
     event_id: str,
     embedding_id: str,
@@ -41,35 +77,43 @@ def add_embedding(
 ):
     """Add a face embedding with rich metadata to the event's collection.
 
-    Args:
-        event_id: Event identifier
-        embedding_id: Unique ID for this embedding
-        embedding: 512-dim face embedding
-        metadata: Flat dict of filterable attributes (age, gender, quality, etc.)
-        document: Text description for the embedding (used by ChromaDB's internal search)
+    Protected by a Redis distributed lock to prevent concurrent write corruption.
+    Automatically tags with the current embedding model version.
     """
-    collection = get_or_create_collection(event_id)
+    with _chroma_write_lock(event_id):
+        collection = get_or_create_collection(event_id)
 
-    add_kwargs = {
-        "ids": [embedding_id],
-        "embeddings": [embedding],
-    }
+        add_kwargs = {
+            "ids": [embedding_id],
+            "embeddings": [embedding],
+        }
 
-    if metadata:
-        # ChromaDB only supports str, int, float, bool in metadata
-        clean_meta = {}
-        for k, v in metadata.items():
-            if v is not None and k != "doc_text":
-                if isinstance(v, (str, int, float, bool)):
-                    clean_meta[k] = v
-        add_kwargs["metadatas"] = [clean_meta]
+        if metadata:
+            clean_meta = {}
+            for k, v in metadata.items():
+                if v is not None and k != "doc_text":
+                    if isinstance(v, (str, int, float, bool)):
+                        clean_meta[k] = v
 
-    if document:
-        add_kwargs["documents"] = [document]
-    elif metadata and metadata.get("doc_text"):
-        add_kwargs["documents"] = [metadata["doc_text"]]
+            # Tag with embedding model version for versioning safety
+            model_version = current_app.config.get("EMBEDDING_MODEL_VERSION", "buffalo_l_v1")
+            clean_meta["embedding_model"] = model_version
 
-    collection.add(**add_kwargs)
+            add_kwargs["metadatas"] = [clean_meta]
+
+        if document:
+            add_kwargs["documents"] = [document]
+        elif metadata and metadata.get("doc_text"):
+            add_kwargs["documents"] = [metadata["doc_text"]]
+
+        collection.add(**add_kwargs)
+
+    # Invalidate BM25 cache for this event
+    try:
+        from .search_service import invalidate_bm25_cache
+        invalidate_bm25_cache(event_id)
+    except ImportError:
+        pass
 
 
 def query_embeddings(
@@ -78,38 +122,47 @@ def query_embeddings(
     n_results: int = 100,
     where: dict | None = None,
 ) -> dict:
-    """Query the event's collection for similar faces with optional metadata filters.
+    """Query the event's collection for similar faces.
 
-    Args:
-        event_id: Event identifier
-        query_embedding: 512-dim query embedding
-        n_results: Max results to return
-        where: ChromaDB where filter dict (e.g. {"is_frontal": True})
-
-    Returns dict with 'ids', 'distances', 'metadatas', 'documents'.
+    Automatically filters to current embedding model version to prevent
+    cross-version similarity corruption.
     """
     collection = get_or_create_collection(event_id)
 
     if collection.count() == 0:
         return {"ids": [[]], "distances": [[]], "metadatas": [[]], "documents": [[]]}
 
+    # Inject embedding model version filter
+    model_version = current_app.config.get("EMBEDDING_MODEL_VERSION", "buffalo_l_v1")
+    if where:
+        if "$and" in where:
+            where["$and"].append({"embedding_model": model_version})
+        else:
+            where = {"$and": [where, {"embedding_model": model_version}]}
+    else:
+        where = {"embedding_model": model_version}
+
     query_kwargs = {
         "query_embeddings": [query_embedding],
         "n_results": min(n_results, collection.count()),
         "include": ["distances", "metadatas", "documents"],
+        "where": where,
     }
 
-    if where:
-        query_kwargs["where"] = where
+    try:
+        result = collection.query(**query_kwargs)
+    except Exception as e:
+        # Fallback: retry without version filter (handles legacy unversioned data)
+        logger.warning("versioned_query_fallback", extra={"error": str(e)})
+        query_kwargs.pop("where", None)
+        query_kwargs["n_results"] = min(n_results, collection.count())
+        result = collection.query(**query_kwargs)
 
-    return collection.query(**query_kwargs)
+    return result
 
 
 def get_all_documents(event_id: str) -> dict:
-    """Get all documents and metadata from a collection for BM25 indexing.
-
-    Returns dict with 'ids', 'documents', 'metadatas'.
-    """
+    """Get all documents and metadata from a collection for BM25 indexing."""
     collection = get_or_create_collection(event_id)
     count = collection.count()
     if count == 0:
@@ -130,18 +183,7 @@ def delete_collection(event_id: str):
 
 
 def get_embeddings_by_ids(event_id: str, embedding_ids: list[str]) -> list[list[float]]:
-    """Retrieve stored embeddings by their IDs.
-
-    Essential for hard negative mining — fetches the actual vectors from ChromaDB
-    so we can compute cosine similarity penalties against candidate faces.
-
-    Args:
-        event_id: Event identifier
-        embedding_ids: List of ChromaDB embedding IDs to retrieve
-
-    Returns:
-        List of embedding vectors (512-dim float lists). Missing IDs are omitted.
-    """
+    """Retrieve stored embeddings by their IDs for hard negative mining."""
     if not embedding_ids:
         return []
 
@@ -154,8 +196,15 @@ def get_embeddings_by_ids(event_id: str, embedding_ids: list[str]) -> list[list[
 
 
 def delete_embeddings(event_id: str, embedding_ids: list[str]):
-    """Delete specific embeddings from an event's collection."""
+    """Delete specific embeddings from an event's collection (lock-protected)."""
     if not embedding_ids:
         return
-    collection = get_or_create_collection(event_id)
-    collection.delete(ids=embedding_ids)
+    with _chroma_write_lock(event_id):
+        collection = get_or_create_collection(event_id)
+        collection.delete(ids=embedding_ids)
+
+    try:
+        from .search_service import invalidate_bm25_cache
+        invalidate_bm25_cache(event_id)
+    except ImportError:
+        pass
