@@ -60,44 +60,64 @@ export default function GalleryPage() {
   }
 
   return (
-    <div className="min-h-screen py-12 px-4">
-      <div className="max-w-5xl mx-auto space-y-6">
-        <div>
-          <Link
-            href={`/event/${eventId}`}
-            className="text-sm text-warm-500 hover:text-warm-700 mb-1 inline-block"
-          >
-            &larr; Back to event
-          </Link>
-          <h1 className="text-2xl font-bold text-warm-900">All Photos</h1>
-          <p className="text-warm-500">{images.length} photos</p>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Background */}
+      <div className="absolute inset-0 pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-[500px] h-[500px] bg-warm-200/20 rounded-full blur-3xl" />
+        <div className="absolute -bottom-32 -left-32 w-80 h-80 bg-gold/8 rounded-full blur-3xl" />
+      </div>
+
+      <div className="relative z-10 py-8 sm:py-12 px-4">
+        <div className="max-w-5xl mx-auto space-y-6">
+          {/* Header */}
+          <div className="animate-fade-in">
+            <Link
+              href={`/event/${eventId}`}
+              className="inline-flex items-center gap-1.5 text-sm text-warm-400 hover:text-warm-600 transition-colors mb-3"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+              </svg>
+              Back
+            </Link>
+            <h1
+              className="text-2xl sm:text-3xl font-bold text-warm-900 tracking-tight"
+              style={{ fontFamily: "'Playfair Display', serif" }}
+            >
+              All Photos
+            </h1>
+            <p className="text-warm-500 mt-1">{images.length} photos</p>
+          </div>
+
+          {/* Grid */}
+          <div className="animate-fade-in">
+            <ImageGrid
+              images={images}
+              eventId={eventId}
+              onImageClick={setPreviewImage}
+              hasMore={hasMore}
+              onLoadMore={loadMore}
+            />
+          </div>
+
+          <ImagePreview
+            image={previewImage}
+            eventId={eventId}
+            onClose={() => setPreviewImage(null)}
+            onPrev={
+              currentIdx > 0
+                ? () => setPreviewImage(images[currentIdx - 1])
+                : undefined
+            }
+            onNext={
+              currentIdx < images.length - 1
+                ? () => setPreviewImage(images[currentIdx + 1])
+                : undefined
+            }
+            hasPrev={currentIdx > 0}
+            hasNext={currentIdx < images.length - 1}
+          />
         </div>
-
-        <ImageGrid
-          images={images}
-          eventId={eventId}
-          onImageClick={setPreviewImage}
-          hasMore={hasMore}
-          onLoadMore={loadMore}
-        />
-
-        <ImagePreview
-          image={previewImage}
-          eventId={eventId}
-          onClose={() => setPreviewImage(null)}
-          onPrev={
-            currentIdx > 0
-              ? () => setPreviewImage(images[currentIdx - 1])
-              : undefined
-          }
-          onNext={
-            currentIdx < images.length - 1
-              ? () => setPreviewImage(images[currentIdx + 1])
-              : undefined
-          }
-          hasPrev={currentIdx > 0}
-          hasNext={currentIdx < images.length - 1}
-        />
       </div>
     </div>
   );
