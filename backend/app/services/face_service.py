@@ -66,7 +66,11 @@ def detect_faces(image_np: np.ndarray) -> list[dict]:
 
 
 def detect_single_face(image_np: np.ndarray) -> dict:
-    """Detect exactly one face in a selfie image. Raises ValueError if not exactly one.
+    """Detect the primary face in a selfie image.
+
+    If multiple faces are detected, selects the most prominent one
+    (largest area weighted by detection confidence). Raises ValueError
+    if no faces are found.
 
     Returns the same dict format as detect_faces but for a single face,
     plus additional metadata from the raw face object for query enrichment.
@@ -78,9 +82,12 @@ def detect_single_face(image_np: np.ndarray) -> dict:
             "No face detected in the selfie. Please upload a clear photo of your face."
         )
 
-    if len(faces) > 1:
-        raise ValueError(
-            "Multiple faces detected. Please upload a photo with only your face."
-        )
+    if len(faces) == 1:
+        return faces[0]
 
-    return faces[0]
+    # Multiple faces: select the most prominent (largest area * highest confidence)
+    def face_prominence(f):
+        area = f["bbox"]["w"] * f["bbox"]["h"]
+        return area * f["score"]
+
+    return max(faces, key=face_prominence)

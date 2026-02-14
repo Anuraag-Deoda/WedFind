@@ -54,20 +54,33 @@ def create_app(config_name=None):
     from .api.upload import upload_bp
     from .api.search import search_bp
     from .api.jobs import jobs_bp
+    from .api.albums import albums_bp
 
     app.register_blueprint(health_bp, url_prefix="/api")
     app.register_blueprint(events_bp, url_prefix="/api")
     app.register_blueprint(upload_bp, url_prefix="/api")
     app.register_blueprint(search_bp, url_prefix="/api")
     app.register_blueprint(jobs_bp, url_prefix="/api")
+    app.register_blueprint(albums_bp, url_prefix="/api")
 
     # ── Database tables ──────────────────────────────────────────────
     with app.app_context():
         from . import models  # noqa: F401
-        try:
-            db.create_all()
-        except Exception:
-            pass
+        if app.config.get("DEBUG") or app.config.get("TESTING"):
+            try:
+                db.create_all()
+            except Exception as e:
+                logger.error("database_create_all_failed", extra={"error": str(e)})
+                raise
+        else:
+            # Production: verify DB is accessible but don't auto-create tables.
+            # Use migrations (alembic) for schema changes.
+            try:
+                db.session.execute(db.text("SELECT 1"))
+                db.session.rollback()
+            except Exception as e:
+                logger.error("database_connection_failed", extra={"error": str(e)})
+                raise
 
     # ── Preload InsightFace model ────────────────────────────────────
     try:

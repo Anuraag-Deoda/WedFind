@@ -1,12 +1,17 @@
+import os
+
 from celery import Celery
 from celery.signals import worker_process_init
 
 
 def make_celery(app=None):
+    broker = os.environ.get("CELERY_BROKER_URL", "redis://localhost:6379/0")
+    backend = os.environ.get("CELERY_RESULT_BACKEND", broker)
+
     celery = Celery(
         "wedding_photo_finder",
-        broker="redis://localhost:6379/0",
-        backend="redis://localhost:6379/0",
+        broker=broker,
+        backend=backend,
     )
 
     if app:
@@ -31,7 +36,15 @@ def make_celery(app=None):
         task_track_started=True,
         worker_prefetch_multiplier=1,
         task_acks_late=True,
-        include=["app.tasks.process_image"],
+        task_reject_on_worker_lost=True,
+        worker_max_tasks_per_child=50,
+        worker_max_memory_per_child=512_000,  # 512MB per worker child
+        task_default_retry_delay=30,
+        broker_connection_retry_on_startup=True,
+        include=[
+            "app.tasks.process_image",
+            "app.tasks.generate_album",
+        ],
     )
 
     return celery
