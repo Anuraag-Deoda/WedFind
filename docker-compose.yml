@@ -42,6 +42,7 @@ services:
       - DATABASE_URL=sqlite:////app/data/app.db
       - LOG_FORMAT=${LOG_FORMAT:-json}
       - CORS_ORIGINS=https://staging.brinx.ai
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     volumes:
       - /home/ec2-user/app/images:/app/storage
       - /home/ec2-user/app/db:/app/data
@@ -78,6 +79,7 @@ services:
       - CHROMADB_DIR=/app/chromadb_data
       - DATABASE_URL=sqlite:////app/data/app.db
       - LOG_FORMAT=${LOG_FORMAT:-json}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
     volumes:
       - /home/ec2-user/app/images:/app/storage
       - /home/ec2-user/app/db:/app/data

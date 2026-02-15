@@ -89,3 +89,69 @@ export interface UploadResponse {
   images_rejected: number;
   duplicates_skipped: number;
 }
+
+// ── Smart Search ──────────────────────────────────────────────────
+
+export interface ParsedQuery {
+  scene: string | null;
+  lighting: string | null;
+  context: string | null;
+  people: string | null;
+  mood: string | null;
+  requires_face_match: boolean;
+}
+
+export interface SmartSearchResult {
+  image: ImageRecord;
+  similarity?: number;
+  relevance_score?: number;
+  match_details?: MatchDetails;
+}
+
+export interface SmartSearchResponse {
+  results: SmartSearchResult[];
+  count: number;
+  mode: "hybrid" | "metadata";
+  query: string;
+  parsed_query: ParsedQuery | null;
+  threshold?: number;
+  selfie_hash?: string;
+  feedback_applied?: boolean;
+  feedback_stats?: FeedbackStats;
+}
+
+// ── Albums ────────────────────────────────────────────────────────
+
+export interface MomentPhoto {
+  id: string;
+  image_id: string;
+  sort_order: number;
+  image: ImageRecord | null;
+}
+
+export interface Moment {
+  id: string;
+  caption: string;
+  scene_type: string | null;
+  time_start: string | null;
+  time_end: string | null;
+  photo_count: number;
+  avg_faces: number | null;
+  dominant_scene: string | null;
+  lighting: string | null;
+  mood: string | null;
+  sort_order: number;
+  photos?: MomentPhoto[];
+}
+
+export interface Album {
+  id: string;
+  event_id: string;
+  title: string;
+  summary: string | null;
+  status: "pending" | "generating" | "completed" | "failed";
+  created_at: string;
+  completed_at: string | null;
+  moment_count: number;
+  moments?: Moment[];
+}

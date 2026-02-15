@@ -1,22 +1,18 @@
 {
-  "name": "Wedding Photo Finder",
-  "short_name": "Photo Finder",
-  "description": "Find all photos you appear in by uploading a selfie",
-  "start_url": "/",
+  "name": "WedFind",
+  "short_name": "WedFind",
+  "description": "AI-powered wedding photo discovery",
+  "start_url": "/new-app",
   "display": "standalone",
-  "background_color": "#faf8f5",
-  "theme_color": "#faf8f5",
+  "background_color": "#faf7ff",
+  "theme_color": "#faf7ff",
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "/icon-512.png",
+      "src": "/new-app/logo.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }

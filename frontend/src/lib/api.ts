@@ -178,6 +178,68 @@ export async function submitSearchFeedback(
   });
 }
 
+// Smart Search
+export async function smartSearch(
+  eventId: string,
+  options: {
+    query?: string;
+    selfie?: Blob;
+    threshold?: number;
+    excludedImageIds?: string[];
+    maxResults?: number;
+  }
+) {
+  const formData = new FormData();
+  formData.append("event_id", eventId);
+  if (options.query) {
+    formData.append("query", options.query);
+  }
+  if (options.selfie) {
+    formData.append("selfie", options.selfie, "selfie.jpg");
+  }
+  if (options.threshold !== undefined) {
+    formData.append("threshold", options.threshold.toString());
+  }
+  if (options.excludedImageIds && options.excludedImageIds.length > 0) {
+    formData.append("excluded_image_ids", options.excludedImageIds.join(","));
+  }
+  if (options.maxResults !== undefined) {
+    formData.append("max_results", options.maxResults.toString());
+  }
+
+  return request<import("@/types").SmartSearchResponse>("/search/smart", {
+    method: "POST",
+    body: formData,
+  });
+}
+
+// Albums
+export async function generateAlbum(eventId: string) {
+  return request<{ album_id: string; status: string; message: string }>(
+    `/events/${eventId}/albums/generate`,
+    { method: "POST" }
+  );
+}
+
+export async function listAlbums(eventId: string) {
+  return request<{ albums: import("@/types").Album[]; count: number }>(
+    `/events/${eventId}/albums`
+  );
+}
+
+export async function getAlbum(eventId: string, albumId: string) {
+  return request<import("@/types").Album>(
+    `/events/${eventId}/albums/${albumId}`
+  );
+}
+
+export async function deleteAlbum(eventId: string, albumId: string) {
+  return request<{ message: string }>(
+    `/events/${eventId}/albums/${albumId}`,
+    { method: "DELETE" }
+  );
+}
+
 // Images
 export function getImageUrl(eventId: string, filename: string) {
   return `${API_BASE}/events/${eventId}/file/${filename}`;
