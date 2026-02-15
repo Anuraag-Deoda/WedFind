@@ -115,19 +115,14 @@ class SearchService:
         recall_threshold = max(0.3, threshold - 0.20)
         broad_n = min(max_results * 3, 300)
 
-        # Build optional pre-filter from selfie metadata (gender)
-        where_filter = metadata_filters.copy() if metadata_filters else None
-        selfie_gender = selfie_meta.get("gender")
-        if selfie_gender and not where_filter:
-            where_filter = {"gender": selfie_gender}
-        elif selfie_gender and where_filter and "gender" not in where_filter:
-            where_filter["gender"] = selfie_gender
-
+        # Vector recall — no pre-filtering to maximize recall.
+        # Gender and metadata filtering caused too many false negatives
+        # (gender detection is unreliable, metadata filters too strict).
+        # Re-ranking stages handle quality differentiation instead.
         vector_results = vector_service.query_embeddings(
             event_id=event_id,
             query_embedding=query_embedding,
             n_results=broad_n,
-            where=where_filter,
         )
 
         empty_response = {
@@ -136,19 +131,6 @@ class SearchService:
             "feedback_applied": False,
             "feedback_stats": feedback_service.get_feedback_stats(event_id, selfie_hash),
         }
-
-        # Fall back to unfiltered query if gender filter returned too few results
-        result_count = len(vector_results["ids"][0]) if vector_results["ids"] and vector_results["ids"][0] else 0
-        if result_count < self.MIN_FILTERED_RESULTS and where_filter:
-            logger.debug(
-                "filtered_query_fallback",
-                extra={"event_id": event_id, "filtered_count": result_count},
-            )
-            vector_results = vector_service.query_embeddings(
-                event_id=event_id,
-                query_embedding=query_embedding,
-                n_results=broad_n,
-            )
 
         if not vector_results["ids"] or not vector_results["ids"][0]:
             return empty_response
@@ -392,7 +374,8 @@ class SearchService:
         """Search by metadata/scene only (no face matching).
 
         Used for natural language queries like "dancing photos at night"
-        without a selfie upload.
+        without a selfie upload. Ranks using BM25 against enriched
+        metadata text. Only returns results with non-trivial scores.
         """
         # Get all documents from the event for BM25 ranking
         all_docs = vector_service.get_all_documents(event_id)
@@ -408,56 +391,59 @@ class SearchService:
         if bm25_scores is None:
             return {"results": [], "count": 0}
 
-        # Build scored candidates
+        # Build scored candidates — only include those with meaningful scores
         scored = []
         for i, doc_id in enumerate(doc_ids):
+            score = bm25_scores[i]
+            # Filter out zero/near-zero relevance
+            if score < 0.05:
+                continue
+
             meta = metadatas[i] if i < len(metadatas) else {}
-
-            # Apply metadata filters if provided
-            if metadata_filters:
-                skip = False
-                for key, value in metadata_filters.items():
-                    if meta.get(key) != value:
-                        skip = True
-                        break
-                if skip:
-                    continue
-
             scored.append({
                 "embedding_id": doc_id,
-                "bm25_score": bm25_scores[i],
+                "bm25_score": score,
                 "metadata": meta,
             })
 
         # Sort by BM25 score
         scored.sort(key=lambda x: x["bm25_score"], reverse=True)
-        scored = scored[:max_results]
 
-        # Resolve to images via Face table
-        embedding_ids = [s["embedding_id"] for s in scored]
+        # Resolve to images via Face table — batch lookup
+        all_embedding_ids = [s["embedding_id"] for s in scored]
         face_lookup = {
             f.embedding_id: f
-            for f in Face.query.filter(Face.embedding_id.in_(embedding_ids)).all()
-        }
+            for f in Face.query.filter(Face.embedding_id.in_(all_embedding_ids)).all()
+        } if all_embedding_ids else {}
 
-        image_ids = list({
-            face_lookup[s["embedding_id"]].image_id
-            for s in scored
-            if s["embedding_id"] in face_lookup
-        })
-        images_by_id = {
-            img.id: img
-            for img in Image.query.filter(Image.id.in_(image_ids)).all()
-        }
-
-        results = []
-        seen_images = set()
+        # Deduplicate by image: keep best-scoring face per image
+        image_best: dict[str, dict] = {}
         for s in scored:
             face = face_lookup.get(s["embedding_id"])
-            if not face or face.image_id in seen_images:
+            if not face:
                 continue
-            seen_images.add(face.image_id)
+            img_id = face.image_id
+            if img_id not in image_best or s["bm25_score"] > image_best[img_id]["bm25_score"]:
+                image_best[img_id] = s
 
+        # Sort and limit
+        top_images = sorted(
+            image_best.values(), key=lambda x: x["bm25_score"], reverse=True
+        )[:max_results]
+
+        image_ids_to_load = [
+            face_lookup[s["embedding_id"]].image_id for s in top_images
+        ]
+        images_by_id = {
+            img.id: img
+            for img in Image.query.filter(Image.id.in_(image_ids_to_load)).all()
+        } if image_ids_to_load else {}
+
+        results = []
+        for s in top_images:
+            face = face_lookup.get(s["embedding_id"])
+            if not face:
+                continue
             image = images_by_id.get(face.image_id)
             if not image:
                 continue

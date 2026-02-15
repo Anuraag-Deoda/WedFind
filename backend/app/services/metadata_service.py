@@ -232,22 +232,29 @@ def _extract_dominant_colors(image_np: np.ndarray, k: int = 3) -> list[str]:
 
 def _classify_scene(brightness: float, contrast: float, image_np: np.ndarray) -> str:
     """Heuristic scene classification from image statistics."""
-    h, w = image_np.shape[:2]
-
-    # Check warm tones (wedding receptions often warm-lit)
     r_mean = float(np.mean(image_np[:, :, 0]))
+    g_mean = float(np.mean(image_np[:, :, 1]))
     b_mean = float(np.mean(image_np[:, :, 2]))
     warm_ratio = r_mean / (b_mean + 1e-6)
+
+    # Saturation proxy: high saturation often means colorful events (haldi, mehndi)
+    max_ch = max(r_mean, g_mean, b_mean)
+    min_ch = min(r_mean, g_mean, b_mean)
+    saturation = (max_ch - min_ch) / (max_ch + 1e-6)
 
     if brightness < 50:
         return "night"
     elif brightness < 90:
         if warm_ratio > 1.3:
-            return "indoor_warm"  # reception, candlelight
+            return "indoor_warm"
         return "indoor_dim"
-    elif brightness > 180:
+    elif brightness > 200 and contrast > 50:
         return "outdoor_bright"
+    elif brightness > 160 and warm_ratio > 1.15 and warm_ratio < 1.35:
+        return "golden_hour"
     elif warm_ratio > 1.2:
+        if saturation > 0.3:
+            return "colorful_indoor"
         return "indoor_warm"
     elif contrast > 60:
         return "outdoor"
@@ -350,25 +357,50 @@ def _build_image_text(
     width: int,
     height: int,
 ) -> str:
-    """Build a textual description of the image for BM25 indexing."""
+    """Build a textual description of the image for BM25 indexing.
+
+    Includes natural language synonyms and wedding-specific terms to
+    improve BM25 matching against user queries like 'dancing at night'.
+    """
     parts = []
 
+    # Scene type and its natural language synonyms
+    scene_synonyms = {
+        "night": "night dark evening nighttime low-light stage dance party reception",
+        "indoor_dim": "indoor dim ambient dance party reception dinner",
+        "indoor_warm": "indoor warm reception dinner candlelight celebration party",
+        "colorful_indoor": "indoor colorful vibrant ceremony celebration haldi mehndi sangeet",
+        "outdoor_bright": "outdoor bright daylight sunny garden ceremony baraat",
+        "outdoor": "outdoor daylight garden natural ceremony",
+        "golden_hour": "golden-hour sunset warm outdoor romantic portrait couple",
+        "indoor": "indoor ceremony event celebration",
+    }
     parts.append(f"scene:{scene_type}")
+    parts.append(scene_synonyms.get(scene_type, scene_type))
 
     if brightness > 180:
-        parts.append("bright well-lit")
+        parts.append("bright well-lit day daytime")
     elif brightness < 80:
-        parts.append("dark low-light")
+        parts.append("dark low-light night evening")
 
     if sharpness > 200:
-        parts.append("sharp crisp")
+        parts.append("sharp crisp clear")
     elif sharpness < 30:
-        parts.append("soft blurry")
+        parts.append("soft blurry candid motion")
 
     if contrast > 60:
-        parts.append("high-contrast")
+        parts.append("high-contrast dramatic")
 
-    parts.append(f"colors:{','.join(colors)}")
+    # Color-based wedding context hints
+    for c in colors:
+        if c in ("gold", "red"):
+            parts.append("traditional festive ceremony wedding")
+        elif c == "green":
+            parts.append("outdoor garden nature mehndi")
+        elif c == "pink":
+            parts.append("romantic floral decoration")
+        elif c == "white":
+            parts.append("bright elegant formal")
 
     orientation = "landscape" if width > height else "portrait" if height > width else "square"
     parts.append(orientation)
@@ -385,39 +417,51 @@ def _build_face_text(
     face_quality: float,
     yaw: float | None,
 ) -> str:
-    """Build a textual description of a face for BM25 indexing."""
+    """Build a textual description of a face for BM25 indexing.
+
+    Includes natural language terms for better matching against user queries.
+    """
     parts = []
 
     if gender:
         parts.append(f"gender:{gender.lower()}")
+        if gender == "M":
+            parts.append("male man groom")
+        else:
+            parts.append("female woman bride")
     if age is not None:
         parts.append(f"age:{age}")
-        parts.append(f"bracket:{_age_bracket(age)}")
+        bracket = _age_bracket(age)
+        parts.append(f"bracket:{bracket}")
+        if bracket == "child":
+            parts.append("kid child children")
+        elif bracket == "senior":
+            parts.append("elder family")
 
     if is_frontal:
-        parts.append("frontal facing-camera")
+        parts.append("frontal facing-camera portrait posed")
     else:
         if yaw is not None:
             if abs(yaw) > 45:
-                parts.append("profile side-view")
+                parts.append("profile side-view candid")
             else:
-                parts.append("angled partial-profile")
+                parts.append("angled candid natural")
 
     if prominence > 0.05:
-        parts.append("close-up prominent large-face")
+        parts.append("close-up prominent portrait solo couple")
     elif prominence > 0.01:
         parts.append("medium-shot")
     else:
-        parts.append("background small-face group")
+        parts.append("background group crowd gathering")
 
     if center_dist < 0.2:
-        parts.append("centered")
+        parts.append("centered stage main")
     elif center_dist > 0.6:
-        parts.append("edge peripheral")
+        parts.append("edge peripheral background")
 
     if face_quality > 0.7:
-        parts.append("high-quality clear")
+        parts.append("high-quality clear sharp")
     elif face_quality < 0.3:
-        parts.append("low-quality unclear")
+        parts.append("low-quality unclear blurry")
 
     return " ".join(parts)

@@ -132,28 +132,20 @@ def query_embeddings(
     if collection.count() == 0:
         return {"ids": [[]], "distances": [[]], "metadatas": [[]], "documents": [[]]}
 
-    # Inject embedding model version filter
-    model_version = current_app.config.get("EMBEDDING_MODEL_VERSION", "buffalo_l_v1")
-    if where:
-        if "$and" in where:
-            where["$and"].append({"embedding_model": model_version})
-        else:
-            where = {"$and": [where, {"embedding_model": model_version}]}
-    else:
-        where = {"embedding_model": model_version}
-
     query_kwargs = {
         "query_embeddings": [query_embedding],
         "n_results": min(n_results, collection.count()),
         "include": ["distances", "metadatas", "documents"],
-        "where": where,
     }
+
+    if where:
+        query_kwargs["where"] = where
 
     try:
         result = collection.query(**query_kwargs)
     except Exception as e:
-        # Fallback: retry without version filter (handles legacy unversioned data)
-        logger.warning("versioned_query_fallback", extra={"error": str(e)})
+        # Fallback: retry without where filter (handles invalid filter values)
+        logger.warning("filtered_query_fallback", extra={"error": str(e)})
         query_kwargs.pop("where", None)
         query_kwargs["n_results"] = min(n_results, collection.count())
         result = collection.query(**query_kwargs)

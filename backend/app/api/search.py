@@ -145,7 +145,7 @@ def smart_search():
         from ..services.llm_service import parse_search_query, build_search_filters
         parsed_query = parse_search_query(query)
         if parsed_query:
-            metadata_filters, extra_query_text = build_search_filters(parsed_query)
+            metadata_filters, extra_query_text = build_search_filters(parsed_query, raw_query=query)
         else:
             # Fallback: use raw query as BM25 text
             extra_query_text = query

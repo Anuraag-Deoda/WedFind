@@ -89,20 +89,30 @@ def parse_search_query(query: str) -> dict | None:
         return None
 
 
-def build_search_filters(parsed_query: dict) -> tuple[dict | None, str]:
-    """Convert parsed query into ChromaDB where-clause and BM25 query text.
+def build_search_filters(parsed_query: dict, raw_query: str = "") -> tuple[dict | None, str]:
+    """Convert parsed query into BM25 query text for metadata search.
+
+    Does NOT create strict ChromaDB where-clause filters, because
+    scene_type values in the DB (e.g. "indoor_warm") rarely match
+    the LLM-parsed labels (e.g. "dance"). Instead, all parsed terms
+    are added to the BM25 query for soft matching against the
+    enriched metadata text.
 
     Args:
         parsed_query: Dict from parse_search_query()
+        raw_query: The original user query string
 
     Returns:
-        Tuple of (chromadb_where_filter or None, bm25_query_text)
+        Tuple of (None, bm25_query_text)
     """
-    where_filter = {}
     query_terms = []
 
+    # Always include the raw user query — BM25 matches naturally
+    if raw_query:
+        query_terms.append(raw_query)
+
+    # Add parsed terms for extra coverage
     if parsed_query.get("scene"):
-        where_filter["scene_type"] = parsed_query["scene"]
         query_terms.append(parsed_query["scene"])
 
     if parsed_query.get("lighting"):
@@ -117,7 +127,7 @@ def build_search_filters(parsed_query: dict) -> tuple[dict | None, str]:
     if parsed_query.get("mood"):
         query_terms.append(parsed_query["mood"])
 
-    return (where_filter if where_filter else None, " ".join(query_terms))
+    return (None, " ".join(query_terms))
 
 
 # ── Album Generation ─────────────────────────────────────────────────
